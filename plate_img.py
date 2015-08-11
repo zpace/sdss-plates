@@ -71,12 +71,12 @@ def make_SDSS_field_cutout(ra, dec, plate_num, width=3.1, scale=5.5):
                             height=(width*3600.)//scale)
     print img.shape, (width*3600.)//scale
     ralims = [sum(i) for i in zip([ra, ] * 2, [width/2., -width/2.])]
-    declims = [sum(i) for i in zip([dec, ] * 2, [width/2., -width/2.])]
+    declims = [sum(i) for i in zip([dec, ] * 2, [-width/2., width/2.])]
 
-    fig = plt.figure(figsize=(8.5, 8.), dpi=300)
+    fig = plt.figure(figsize=(8.5, 8.), dpi=100)
     ax = fig.add_subplot(111)
 
-    ax.imshow(img, origin='lower', aspect='equal',
+    ax.imshow(img, origin='upper', aspect='equal',
               extent=ralims + declims)
 
     # add in plate shape and center post
@@ -98,7 +98,7 @@ def make_SDSS_field_cutout(ra, dec, plate_num, width=3.1, scale=5.5):
                marker='o', facecolor='none', edgecolor='g',
                label='QSOs')
     ax.scatter(galaxies['ra'], galaxies['dec'],
-               marker='+', facecolor='none', edgecolor='r',
+               marker='v', facecolor='none', edgecolor='r',
                label='Galaxies')
     plt.legend(loc='best')
 
@@ -200,7 +200,7 @@ def make_SDSS_field_mpld3(ra, dec, plate_num, width=3.1, scale=5.5):
                             height=(width*3600.)//scale)
     print img.shape, (width*3600.)//scale
     ralims = [sum(i) for i in zip([ra, ] * 2, [width/2., -width/2.])]
-    declims = [sum(i) for i in zip([dec, ] * 2, [width/2., -width/2.])]
+    declims = [sum(i) for i in zip([dec, ] * 2, [-width/2., width/2.])]
 
     fig = plt.figure(figsize=(8.5, 8.), dpi=100)
     ax = fig.add_subplot(111)
@@ -220,6 +220,22 @@ def make_SDSS_field_mpld3(ra, dec, plate_num, width=3.1, scale=5.5):
     QSOs = plate_objs[plate_objs['class'] == 'QSO']
     galaxies = plate_objs[plate_objs['class'] == 'GALAXY']
 
+    url_base = \
+        'http://skyserver.sdss.org/dr12/en/tools/explore/summary.aspx?id='
+
+    stars.add_column(
+        table.Table.Column(
+            name='urls',
+            data=[url_base + str(row['targetObjID']) for row in stars]))
+    QSOs.add_column(
+        table.Table.Column(
+            name='urls',
+            data=[url_base + str(row['targetObjID']) for row in QSOs]))
+    galaxies.add_column(
+        table.Table.Column(
+            name='urls',
+            data=[url_base + str(row['targetObjID']) for row in galaxies]))
+
     # add locations of objects on plate
 
     stars_points = ax.scatter(stars['ra'], stars['dec'],
@@ -234,9 +250,9 @@ def make_SDSS_field_mpld3(ra, dec, plate_num, width=3.1, scale=5.5):
 
     # ax.legend(loc='best') #not implemented in mpld3 yet
     # replaced with figtext
-    xtext =
-    ytext =
-    ax.figtext()
+    '''xtext =
+                ytext =
+                ax.figtext()'''
 
     # make everything look nice
     ax.set_xlabel('RA [deg]', size=20)
@@ -286,12 +302,6 @@ def make_SDSS_field_mpld3(ra, dec, plate_num, width=3.1, scale=5.5):
         # .to_html() is unicode; so make leading 'u' go away with str()
         labels_galaxies.append(str(label.to_html()))
 
-    url_base = \
-        'http://skyserver.sdss.org/dr12/en/tools/explore/summary.aspx?id='
-    urls_stars = [url_base + str(i) for i in stars['targetObjID']]
-    urls_QSOs = [url_base + str(i) for i in QSOs['targetObjID']]
-    urls_galaxies = [url_base + str(i) for i in galaxies['targetObjID']]
-
     # instantiate the plugins, one for each dataset
     tooltip_stars = plugins.PointHTMLTooltip(stars_points, labels_stars,
                                              voffset=10, hoffset=10, css=css)
@@ -304,8 +314,8 @@ def make_SDSS_field_mpld3(ra, dec, plate_num, width=3.1, scale=5.5):
     plugins.connect(fig, tooltip_QSOs)
     plugins.connect(fig, tooltip_galaxies)
 
-    plugins.connect(fig, ClickInfo(stars_points, urls_stars))
-    plugins.connect(fig, ClickInfo(QSOs_points, urls_QSOs))
-    plugins.connect(fig, ClickInfo(galaxies_points, urls_galaxies))
+    plugins.connect(fig, ClickInfo(stars_points, list(stars['urls'])))
+    plugins.connect(fig, ClickInfo(QSOs_points, list(QSOs['urls'])))
+    plugins.connect(fig, ClickInfo(galaxies_points, list(galaxies['urls'])))
 
     mpld3.save_html(fig, str(plate_num) + '.html')
