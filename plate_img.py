@@ -198,6 +198,7 @@ def make_SDSS_field_mpld3(ra, dec, plate_num, width=3.1, scale=5.5):
     table
     {
       border-collapse: collapse;
+      width: 100%;
     }
     th
     {
@@ -219,7 +220,7 @@ def make_SDSS_field_mpld3(ra, dec, plate_num, width=3.1, scale=5.5):
     plt.close('all')
     img = download_sloan_im(ra, dec, scale=scale, width=(width*3600.)//scale,
                             height=(width*3600.)//scale)
-    print img.shape, (width*3600.)//scale
+    # print img.shape, (width*3600.)//scale
     ralims = [sum(i) for i in zip([ra, ] * 2, [width/2., -width/2.])]
     declims = [sum(i) for i in zip([dec, ] * 2, [-width/2., width/2.])]
 
@@ -236,37 +237,24 @@ def make_SDSS_field_mpld3(ra, dec, plate_num, width=3.1, scale=5.5):
     ax.imshow(img, origin='upper', aspect='equal',
               extent=ralims + declims)
 
-    # add in plate shape and center post
-    plate = plt.Circle((ra, dec), 1.49, color='w', fill=False)
-    ax.add_artist(plate)
-
     # read in locations of objects on plate
     plate_objs = table.Table.read(str(plate_num) + '.csv', format='csv',
                                   comment='\#')
-
-    if transform == True:
-        plate_objs['ra'][plate_objs['ra'] > 180.] -= 360.
-
-    plate_objs = plate_objs[plate_objs['targetObjID'] != 0]
-    stars = plate_objs[plate_objs['class'] == 'STAR']
-    QSOs = plate_objs[plate_objs['class'] == 'QSO']
-    galaxies = plate_objs[plate_objs['class'] == 'GALAXY']
+    plate_objs = pd.read_csv(str(plate_num) + '.csv', comment='#')
 
     url_base = \
         'http://skyserver.sdss.org/dr12/en/tools/explore/summary.aspx?id='
 
-    stars.add_column(
-        table.Table.Column(
-            name='urls',
-            data=[url_base + str(row['targetObjID']) for row in stars]))
-    QSOs.add_column(
-        table.Table.Column(
-            name='urls',
-            data=[url_base + str(row['targetObjID']) for row in QSOs]))
-    galaxies.add_column(
-        table.Table.Column(
-            name='urls',
-            data=[url_base + str(row['targetObjID']) for row in galaxies]))
+    plate_objs['urls'] = pd.Series(
+        b + str(i) for (b, i) in zip(
+            [url_base, ]*len(plate_objs), plate_objs['targetObjID']))
+
+    if transform == True:
+        plate_objs['ra'][plate_objs['ra'] > 180.] -= 360.
+
+    stars = plate_objs[plate_objs['class'] == 'STAR']
+    QSOs = plate_objs[plate_objs['class'] == 'QSO']
+    galaxies = plate_objs[plate_objs['class'] == 'GALAXY']
 
     # add locations of objects on plate
 
@@ -279,12 +267,8 @@ def make_SDSS_field_mpld3(ra, dec, plate_num, width=3.1, scale=5.5):
     galaxies_points = ax.scatter(galaxies['ra'], galaxies['dec'],
                                  marker='v', edgecolors='r', facecolors='none',
                                  label='Galaxies')
-
-    # ax.legend(loc='best') #not implemented in mpld3 yet
-    # replaced with figtext
-    '''xtext =
-                ytext =
-                ax.figtext()'''
+    points = ax.scatter(plate_objs['ra'], plate_objs['dec'],
+                        edgecolors='none', facecolors='none')
 
     # make everything look nice
     ax.set_xlabel('RA [deg]', size=20)
@@ -305,50 +289,17 @@ def make_SDSS_field_mpld3(ra, dec, plate_num, width=3.1, scale=5.5):
 
     plt.tight_layout()
 
-    # read in everything as dataframes, since that makes labeling easier
-    plate_objs_df = pd.read_csv(str(plate_num) + '.csv', comment='#')
-    plate_objs_df = plate_objs_df[plate_objs_df['targetObjID'] != 0]
-
-    stars_df = plate_objs_df[plate_objs_df['class'] == 'STAR']
-    QSOs_df = plate_objs_df[plate_objs_df['class'] == 'QSO']
-    galaxies_df = plate_objs_df[plate_objs_df['class'] == 'GALAXY']
-
-    labels_stars = []
-    for i in range(len(stars)):
-        label = stars_df.iloc[i].T
+    labels = []
+    for i in range(len(plate_objs)):
+        label = plate_objs.iloc[i].T
         label = pd.DataFrame({'Row {0}'.format(i): label})
         # .to_html() is unicode; so make leading 'u' go away with str()
-        labels_stars.append(str(label.to_html()))
+        labels.append(str(label.to_html()))
 
-    labels_QSOs = []
-    for i in range(len(QSOs)):
-        label = QSOs_df.iloc[i].T
-        label = pd.DataFrame({'Row {0}'.format(i): label})
-        # .to_html() is unicode; so make leading 'u' go away with str()
-        labels_QSOs.append(str(label.to_html()))
-
-    labels_galaxies = []
-    for i in range(len(galaxies)):
-        label = galaxies_df.iloc[i].T
-        label = pd.DataFrame({'Row {0}'.format(i): label})
-        # .to_html() is unicode; so make leading 'u' go away with str()
-        labels_galaxies.append(str(label.to_html()))
-
-    # instantiate the plugins, one for each dataset
-    tooltip_stars = plugins.PointHTMLTooltip(stars_points, labels_stars,
-                                             voffset=10, hoffset=10, css=css)
-    tooltip_QSOs = plugins.PointHTMLTooltip(QSOs_points, labels_QSOs,
-                                            voffset=10, hoffset=10, css=css)
-    tooltip_galaxies = plugins.PointHTMLTooltip(
-        galaxies_points, labels_galaxies, voffset=10, hoffset=10, css=css)
-    # link everything
-    plugins.connect(fig, tooltip_stars)
-    plugins.connect(fig, tooltip_QSOs)
-    plugins.connect(fig, tooltip_galaxies)
-
-    plugins.connect(fig, ClickInfo(stars_points, list(stars['urls'])))
-    plugins.connect(fig, ClickInfo(QSOs_points, list(QSOs['urls'])))
-    plugins.connect(fig, ClickInfo(galaxies_points, list(galaxies['urls'])))
+    tooltip = plugins.PointHTMLTooltip(points, labels, voffset=10, hoffset=10,
+                                       css=css)
+    plugins.connect(fig, tooltip)
+    plugins.connect(fig, ClickInfo(points, list(plate_objs['urls'])))
 
     mpld3.save_html(fig, str(plate_num) + '.html')
 
