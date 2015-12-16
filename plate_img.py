@@ -315,7 +315,7 @@ def plate_img_wrapper(plate_num):
 
     # now download the list of objects on that plate
     print 'Accessing CasJobs...'
-    sql = '\'SELECT sp.specObjID, sp.plate, sp.mjd, sp.ra, sp.dec, sp.z, sp.targetObjID, class FROM SpecObjAll sp WHERE (sp.plate = {}) AND ((class = "GALAXY") OR (class = "QSO") OR (class = "STAR")) AND (sp.targetObjID != 0)\''.format(
+    sql = '\'SELECT \n\tsp.specObjID, sp.plate, sp.mjd, sp.ra, sp.dec, sp.z, sp.targetObjID, class \nFROM \n\tSpecObjAll sp \nWHERE \n\t(sp.plate = {}) \n\tAND \n\t((class = "GALAXY") OR (class = "QSO") OR (class = "STAR")) \n\tAND \n\t(sp.targetObjID != 0)\''.format(
         plate_num)
 
     print 'SQL query:\n', sql
