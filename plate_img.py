@@ -9,6 +9,8 @@ from mpld3 import plugins, utils
 import pandas as pd
 import matplotlib as mpl
 from os import system, makedirs
+import sys
+import warnings as w
 
 
 def get_plate_coords(plate_num):
@@ -22,7 +24,8 @@ def get_plate_coords(plate_num):
     ra = row['RACEN']
     dec = row['DECCEN']
     survey = row['SURVEY'].replace(' ', '')
-    print 'Plate {0} ({1}) @ {2}, {3}'.format(plate_num, survey, ra, dec)
+    print 'Plate {0} (survey: {1}) @ (RA, DEC) = ({2}, {3})'.format(
+        plate_num, survey, ra, dec)
     return ra, dec, survey
 
 
@@ -311,10 +314,11 @@ def plate_img_wrapper(plate_num):
     ractr, decctr, survey = get_plate_coords(plate_num)
 
     # now download the list of objects on that plate
+    print 'Accessing CasJobs...'
     sql = '\'SELECT sp.specObjID, sp.plate, sp.mjd, sp.ra, sp.dec, sp.z, sp.targetObjID, class FROM SpecObjAll sp WHERE (sp.plate = {}) AND ((class = "GALAXY") OR (class = "QSO") OR (class = "STAR")) AND (sp.targetObjID != 0)\''.format(
         plate_num)
 
-    # print sql
+    print 'SQL query:\n', sql
 
     # now query SkyServer and throw everything in a csv file
     try:
@@ -323,11 +327,14 @@ def plate_img_wrapper(plate_num):
         pass
     system('python sqlcl.py -q ' + sql + ' >> {}.csv'.format(plate_num))
 
+    print 'Making simple .png field cutout...'
     make_SDSS_field_cutout(ra=ractr, dec=decctr, plate_num=plate_num,
                            width=3.1, scale=5.5)
+    print 'Making clickable webpage...'
     make_SDSS_field_mpld3(ra=ractr, dec=decctr, plate_num=plate_num,
                           width=3.1, scale=5.5)
 
+    print 'Cleaning up...'
     import shutil
     shutil.rmtree('{}/'.format(plate_num), ignore_errors=True)
     makedirs('{}'.format(plate_num))
@@ -337,3 +344,12 @@ def plate_img_wrapper(plate_num):
                 '{}/{}_field.png'.format(plate_num, plate_num))
     shutil.move('{}.html'.format(plate_num),
                 '{}/{}_field_interactive.html'.format(plate_num, plate_num))
+
+if __name__ == '__main__':
+    plist = sys.argv[1:]
+    for p in plist:
+        print 'Running plate', p
+        with w.catch_warnings():
+            w.simplefilter('ignore')
+            plate_img_wrapper(p)
+        print 'DONE!\n++++++++++==========++++++++++'
